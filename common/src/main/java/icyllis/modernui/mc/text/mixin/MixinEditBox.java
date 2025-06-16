@@ -182,8 +182,8 @@ public abstract class MixinEditBox extends AbstractWidget {
                     if (stripIndex < maxStripIndex) {
                         curAdv += advances[stripIndex];
                     } else {
-                        // 安全回退：使用空格宽度
-                        curAdv += engine.getTextRenderer().width(" ");
+                        // ==== 修复1：使用正确的文本宽度测量方法 ====
+                        curAdv += engine.getTextRenderer().measureText(" ", 0, 1);
                     }
                     stripIndex++;
                 }
@@ -234,8 +234,8 @@ public abstract class MixinEditBox extends AbstractWidget {
                 if (stripIndex < maxStripIndex) {
                     startX += advances[stripIndex];
                 } else {
-                    // 安全回退：使用默认字符宽度（空格宽度）
-                    startX += engine.getTextRenderer().width(" ");
+                    // ==== 修复2：使用正确的文本宽度测量方法 ====
+                    startX += engine.getTextRenderer().measureText(" ", 0, 1);
                 }
                 stripIndex++;
             }
