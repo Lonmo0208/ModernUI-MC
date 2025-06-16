@@ -172,12 +172,20 @@ public abstract class MixinEditBox extends AbstractWidget {
                         Style.EMPTY, TextLayoutEngine.COMPUTE_ADVANCES);
                 float curAdv = 0;
                 int stripIndex = 0;
+                float[] advances = layout.getAdvances();
+                int maxStripIndex = advances.length;
                 for (int i = 0; i < viewCursorPos; i++) {
                     if (viewText.charAt(i) == ChatFormatting.PREFIX_CODE) {
                         i++;
                         continue;
                     }
-                    curAdv += layout.getAdvances()[stripIndex++];
+                    if (stripIndex < maxStripIndex) {
+                        curAdv += advances[stripIndex];
+                    } else {
+                        // 安全回退：使用空格宽度
+                        curAdv += engine.getTextRenderer().width(" ");
+                    }
+                    stripIndex++;
                 }
                 cursorX = baseX + curAdv;
             } else {
@@ -213,12 +221,23 @@ public abstract class MixinEditBox extends AbstractWidget {
             float startX = baseX;
             float endX = cursorX;
             int stripIndex = 0;
+            float[] advances = layout.getAdvances();
+            int maxStripIndex = advances.length;
+            
+            // ===== 安全修复：添加边界检查 =====
             for (int i = 0; i < clampedViewHighlightPos; i++) {
                 if (viewText.charAt(i) == ChatFormatting.PREFIX_CODE) {
                     i++;
                     continue;
                 }
-                startX += layout.getAdvances()[stripIndex++];
+                // 确保不会越界访问数组
+                if (stripIndex < maxStripIndex) {
+                    startX += advances[stripIndex];
+                } else {
+                    // 安全回退：使用默认字符宽度（空格宽度）
+                    startX += engine.getTextRenderer().width(" ");
+                }
+                stripIndex++;
             }
 
             if (endX < startX) {
@@ -226,47 +245,53 @@ public abstract class MixinEditBox extends AbstractWidget {
                 startX = endX;
                 endX = temp;
             }
-            if (startX > getX() + width) {
-                startX = getX() + width;
+            
+            // ===== 安全修复：添加边界限制 =====
+            float maxX = getX() + width;
+            startX = Math.min(startX, maxX);
+            endX = Math.min(endX, maxX);
+            
+            // 确保高亮区域有效
+            if (endX > startX) {
+                VertexConsumer consumer = gr.bufferSource().getBuffer(RenderType.guiOverlay());
+                consumer.vertex(matrix, startX, baseY + 10, 0)
+                        .color(51, 181, 229, 56).endVertex();
+                consumer.vertex(matrix, endX, baseY + 10, 0)
+                        .color(51, 181, 229, 56).endVertex();
+                consumer.vertex(matrix, endX, baseY - 1, 0)
+                        .color(51, 181, 229, 56).endVertex();
+                consumer.vertex(matrix, startX, baseY - 1, 0)
+                        .color(51, 181, 229, 56).endVertex();
             }
-            if (endX > getX() + width) {
-                endX = getX() + width;
-            }
-
-            VertexConsumer consumer = gr.bufferSource().getBuffer(RenderType.guiOverlay());
-            consumer.vertex(matrix, startX, baseY + 10, 0)
-                    .color(51, 181, 229, 56).endVertex();
-            consumer.vertex(matrix, endX, baseY + 10, 0)
-                    .color(51, 181, 229, 56).endVertex();
-            consumer.vertex(matrix, endX, baseY - 1, 0)
-                    .color(51, 181, 229, 56).endVertex();
-            consumer.vertex(matrix, startX, baseY - 1, 0)
-                    .color(51, 181, 229, 56).endVertex();
             gr.flush();
         } else if (cursorVisible) {
             if (cursorNotAtEnd) {
                 gr.flush();
-
+                
+                // ===== 安全修复：添加光标位置限制 =====
+                float renderCursorX = Math.min(cursorX, getX() + width - 1);
+                
                 VertexConsumer consumer = gr.bufferSource().getBuffer(RenderType.guiOverlay());
-                consumer.vertex(matrix, cursorX - 0.5f, baseY + 10, 0)
+                consumer.vertex(matrix, renderCursorX - 0.5f, baseY + 10, 0)
                         .color(208, 208, 208, 255).endVertex();
-                consumer.vertex(matrix, cursorX + 0.5f, baseY + 10, 0)
+                consumer.vertex(matrix, renderCursorX + 0.5f, baseY + 10, 0)
                         .color(208, 208, 208, 255).endVertex();
-                consumer.vertex(matrix, cursorX + 0.5f, baseY - 1, 0)
+                consumer.vertex(matrix, renderCursorX + 0.5f, baseY - 1, 0)
                         .color(208, 208, 208, 255).endVertex();
-                consumer.vertex(matrix, cursorX - 0.5f, baseY - 1, 0)
+                consumer.vertex(matrix, renderCursorX - 0.5f, baseY - 1, 0)
                         .color(208, 208, 208, 255).endVertex();
                 gr.flush();
             } else {
-                engine.getTextRenderer().drawText(CURSOR_APPEND_CHARACTER, cursorX, baseY, color, true,
-                        matrix, bufferSource, Font.DisplayMode.NORMAL, 0, LightTexture.FULL_BRIGHT);
-
+                // ===== 安全修复：确保光标在可见区域内 =====
+                if (cursorX < getX() + width) {
+                    engine.getTextRenderer().drawText(CURSOR_APPEND_CHARACTER, cursorX, baseY, color, true,
+                            matrix, bufferSource, Font.DisplayMode.NORMAL, 0, LightTexture.FULL_BRIGHT);
+                }
                 gr.flush();
             }
         } else {
             gr.flush();
         }
-        // unconditional
         ci.cancel();
     }
 }
