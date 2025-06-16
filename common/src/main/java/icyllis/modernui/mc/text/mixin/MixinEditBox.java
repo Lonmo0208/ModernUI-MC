@@ -173,17 +173,20 @@ public abstract class MixinEditBox extends AbstractWidget {
                 float curAdv = 0;
                 int stripIndex = 0;
                 float[] advances = layout.getAdvances();
+                
+                // ===== 安全修复：添加边界检查 =====
                 int maxStripIndex = advances.length;
                 for (int i = 0; i < viewCursorPos; i++) {
                     if (viewText.charAt(i) == ChatFormatting.PREFIX_CODE) {
                         i++;
                         continue;
                     }
+                    // 确保不会越界访问数组
                     if (stripIndex < maxStripIndex) {
                         curAdv += advances[stripIndex];
                     } else {
-                        // ==== 修复1：使用正确的文本宽度测量方法 ====
-                        curAdv += engine.getTextRenderer().measureText(" ", 0, 1);
+                        // 安全回退：使用平均字符宽度 (6像素)
+                        curAdv += 6.0f;
                     }
                     stripIndex++;
                 }
@@ -222,9 +225,9 @@ public abstract class MixinEditBox extends AbstractWidget {
             float endX = cursorX;
             int stripIndex = 0;
             float[] advances = layout.getAdvances();
-            int maxStripIndex = advances.length;
             
             // ===== 安全修复：添加边界检查 =====
+            int maxStripIndex = advances.length;
             for (int i = 0; i < clampedViewHighlightPos; i++) {
                 if (viewText.charAt(i) == ChatFormatting.PREFIX_CODE) {
                     i++;
@@ -234,8 +237,8 @@ public abstract class MixinEditBox extends AbstractWidget {
                 if (stripIndex < maxStripIndex) {
                     startX += advances[stripIndex];
                 } else {
-                    // ==== 修复2：使用正确的文本宽度测量方法 ====
-                    startX += engine.getTextRenderer().measureText(" ", 0, 1);
+                    // 安全回退：使用平均字符宽度 (6像素)
+                    startX += 6.0f;
                 }
                 stripIndex++;
             }
